@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
+import { GUMROAD_URL } from '../src/config.js';
 
 const { CHROME_BIN, PHOTOID_SAMPLE, PHOTOID_EVIDENCE } = process.env;
 const url = process.env.PHOTOID_URL ?? 'http://localhost:4173/photoid/';
@@ -84,11 +85,31 @@ try {
   assert.deepEqual(mediaBox?.split(' ').map(value => Math.round(Number(value))), [0, 0, 288, 432]);
   console.log('Watermarked 4 × 6 in JPG and PDF: six photos, 300 DPI raster.');
 
+  const upsell = page.locator('#upsell-actions');
+  const buy = upsell.getByRole('link', { name: 'Get Pro ₹99' });
+  const enterLicense = upsell.getByRole('button', { name: 'Enter license', exact: true });
+  assert.equal(await upsell.isVisible(), false);
   await page.locator('#paper').selectOption('a4');
+  assert.match(await status(), /Activate Pro to export an A4 sheet/);
+  assert.ok(await buy.isVisible());
+  assert.ok(await enterLicense.isVisible());
+  assert.equal(await buy.getAttribute('href'), GUMROAD_URL);
+  assert.equal(await buy.getAttribute('target'), '_blank');
+  await page.locator('#paper').selectOption('4x6');
+  assert.equal(await upsell.isVisible(), false);
+  await page.getByRole('button', { name: 'Max KB PRO' }).press('Enter');
+  assert.match(await status(), /Activate Pro to set a JPG file size limit/);
+  assert.ok(await buy.isVisible());
+  assert.ok(await enterLicense.isVisible());
+  await page.locator('#paper').selectOption('a4');
+  await page.getByRole('button', { name: 'Max KB PRO' }).click();
   await page.locator('[data-download="sheet"]').click();
   assert.match(await status(), /Activate Pro to export an A4 sheet/);
+  assert.ok(await buy.isVisible());
+  assert.ok(await enterLicense.isVisible());
+  console.log('A4 selection, Max KB, and blocked A4 download each show Gumroad and license actions.');
 
-  await page.getByRole('button', { name: 'Enter license', exact: true }).click();
+  await enterLicense.click();
   await page.locator('#license-key').fill('INVALID-TEST-KEY');
   const [licenseResponse] = await Promise.all([
     page.waitForResponse('https://api.gumroad.com/v2/licenses/verify'),

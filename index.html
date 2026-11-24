@@ -89,14 +89,24 @@
               <span class="eyebrow">03 / DOWNLOAD</span>
               <div class="two-fields">
                 <div><label for="paper">Print paper</label><select id="paper"><option value="4x6">4 × 6 in</option><option value="a4">A4 · Pro</option></select></div>
-                <div><label for="max-kb">Max KB <small>PRO</small></label><input id="max-kb" type="number" min="1" max="20000" step="1" placeholder="Optional" /></div>
+                <div>
+                  <label id="max-kb-label" for="max-kb-upsell">Max KB <small>PRO</small></label>
+                  <button id="max-kb-upsell" type="button" aria-labelledby="max-kb-label" aria-controls="editor-feedback">Set a limit</button>
+                  <input id="max-kb" type="number" min="1" max="20000" step="1" placeholder="Optional" hidden />
+                </div>
               </div>
               <div class="downloads">
                 <button class="button primary" type="button" data-download="digital">Digital JPG</button>
                 <button class="button secondary" type="button" data-download="sheet">Print JPG</button>
                 <button class="button secondary" type="button" data-download="pdf">Print PDF</button>
               </div>
-              <p id="editor-status" role="status" aria-live="polite"></p>
+              <div id="editor-feedback">
+                <p id="editor-status" role="status" aria-live="polite"></p>
+                <div class="upsell-actions" id="upsell-actions" hidden>
+                  <a class="button primary" data-buy target="_blank" rel="noopener noreferrer">Get Pro ₹99</a>
+                  <button class="quiet" type="button" data-license>Enter license</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -10,11 +10,16 @@ const preview = $('preview');
 const previewCtx = preview.getContext('2d');
 const presetSelect = $('preset');
 const background = $('background');
+const paper = $('paper');
 const maxKB = $('max-kb');
+const maxKBUpsell = $('max-kb-upsell');
 const status = $('editor-status');
+const editorFeedback = $('editor-feedback');
+const upsellActions = $('upsell-actions');
 const licenseDialog = $('license-dialog');
 const cameraDialog = $('camera-dialog');
 const colors = { original: '#fff', white: '#fff', cream: '#f5f1e8', blue: '#dcecff' };
+const a4Upsell = 'Activate Pro to export an A4 sheet.';
 
 let source;
 let foreground;
@@ -29,7 +34,9 @@ let manualRevision = 0;
 let drag;
 const pose = { x: 0.5, y: 0.5, zoom: 1, angle: 0 };
 
-function announce(message, error = false) {
+function announce(message, error = false, upsell = false) {
+  upsellActions.hidden = !upsell;
+  editorFeedback.classList.toggle('with-upsell', upsell);
   status.textContent = message;
   status.classList.toggle('error', error);
 }
@@ -229,6 +236,9 @@ function updatePro() {
     item.textContent = pro ? 'Pro active' : 'Free preview';
   }
   maxKB.disabled = !pro;
+  maxKB.hidden = !pro;
+  maxKBUpsell.hidden = pro;
+  $('max-kb-label').htmlFor = pro ? maxKB.id : maxKBUpsell.id;
   for (const button of document.querySelectorAll('[data-license]')) {
     button.hidden = pro;
   }
@@ -237,9 +247,9 @@ function updatePro() {
 async function download(kind, button) {
   const preset = format();
   if (!source || !preset) return;
-  const paperId = $('paper').value;
+  const paperId = paper.value;
   if (!pro && (!preset.free || (kind !== 'digital' && paperId === 'a4'))) {
-    announce(!preset.free ? 'This preset is available to preview. Activate Pro to download it.' : 'Activate Pro to export an A4 sheet.', true);
+    announce(!preset.free ? 'Activate Pro to download this preset.' : a4Upsell, false, true);
     return;
   }
   const limit = Number(maxKB.value);
@@ -259,11 +269,11 @@ async function download(kind, button) {
       announce(`Digital JPG saved · ${(blob.size / 1000).toFixed(1)} KB${pro ? '' : ' · watermarked preview'}.`);
       return;
     }
-    const paper = sheets[paperId];
-    const { canvas, count } = makeSheet(photo, paper);
+    const sheet = sheets[paperId];
+    const { canvas, count } = makeSheet(photo, sheet);
     const jpg = await jpeg(canvas);
     const ext = kind === 'pdf' ? 'pdf' : 'jpg';
-    save(kind === 'pdf' ? await pdf(jpg, paper) : jpg, `photoid-${preset.id}-${paperId}.${ext}`);
+    save(kind === 'pdf' ? await pdf(jpg, sheet) : jpg, `photoid-${preset.id}-${paperId}.${ext}`);
     announce(`${count} photos saved with cut marks. Print at actual size (100%), not “fit to page”.`);
   } catch (error) {
     announce(error.message, true);
@@ -283,6 +293,14 @@ for (const button of document.querySelectorAll('[data-license]')) {
 for (const button of document.querySelectorAll('[data-download]')) {
   button.addEventListener('click', () => void download(button.dataset.download, button));
 }
+paper.addEventListener('change', () => {
+  if (pro) return;
+  if (paper.value === 'a4') announce(a4Upsell, false, true);
+  else if (status.textContent === a4Upsell) announce('');
+});
+maxKBUpsell.addEventListener('click', () => {
+  if (!pro) announce('Activate Pro to set a JPG file size limit.', false, true);
+});
 
 $('license-form').addEventListener('submit', async event => {
   event.preventDefault();

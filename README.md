@@ -1,6 +1,6 @@
 # PhotoID
 
-PhotoID makes passport and visa photos in the browser. Photos and camera frames are processed on the device. There is no API server or analytics. MediaPipe fetches its WASM and model assets on demand; a connection is needed for uncached models and Gumroad activation, but manual cropping and exports don't depend on the models.
+PhotoID makes passport and visa photos in the browser. Photos and camera frames are processed on the device. There is no API server or analytics. Automatic framing and background replacement fetch their runtimes and models on demand. Detailed background replacement uses MediaPipe to find the person and Apache-2.0 MODNet in a Web Worker to refine their outline. MODNet weights are cached when browser storage is available. If detailed matting is unavailable, the editor can use the MediaPipe mask alone. Manual cropping and exports don't depend on the models.
 
 See [third-party notices](public/third-party-notices.txt) for bundled dependencies.
 

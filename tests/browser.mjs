@@ -54,6 +54,7 @@ try {
 
   await page.locator('#background').selectOption('blue');
   await page.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Background replaced.'), { }, { timeout: 40000 });
+  assert.doesNotMatch(await status(), /simple mode/);
   const [corner, face] = await page.locator('#preview').evaluate(canvas => {
     const ctx = canvas.getContext('2d');
     return [[8, 8], [206, 238]].map(([x, y]) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3)));
@@ -132,10 +133,16 @@ try {
   assert.deepEqual(errors, []);
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, deviceScaleFactor: 1, hasTouch: true });
+  await mobile.route(url => /\/portrait\.worker(?:-[^/]+)?\.js$/.test(url.pathname), route => route.abort());
   await mobile.goto(url);
   assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth), 390);
   if (PHOTOID_EVIDENCE) await mobile.screenshot({ path: join(PHOTOID_EVIDENCE, 'photoid-mobile.png') });
   console.log('Mobile layout at 390px has no horizontal overflow.');
+  await mobile.locator('#file').setInputFiles(PHOTOID_SAMPLE);
+  await mobile.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Face found.'));
+  await mobile.locator('#background').selectOption('white');
+  await mobile.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Background replaced with simple mode.'));
+  console.log('MediaPipe fallback works when the portrait worker cannot load.');
 } finally {
   await browser.close();
 }

@@ -1,8 +1,13 @@
 PhotoID — Third-party notices
 
-MediaPipe Tasks Vision (Google) and DOMPurify (Cure53): Apache License, Version 2.0.
+MediaPipe Tasks Vision (Google), DOMPurify (Cure53), and MODNet: Apache License, Version 2.0.
 https://github.com/google-ai-edge/mediapipe
 https://github.com/cure53/DOMPurify
+https://github.com/ZHKKKe/MODNet
+https://huggingface.co/Xenova/modnet
+
+ONNX Runtime Web (Microsoft Corporation): MIT; loaded from jsDelivr.
+https://github.com/microsoft/onnxruntime
 
 
                                  Apache License

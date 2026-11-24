@@ -1,9 +1,9 @@
 import './style.css';
 import { GUMROAD_URL, PRODUCT_ID } from './config.js';
-import { mmToPixels, presets, sheets, targetHead } from './formats.js';
+import { digitalDimensions, headCenter, presets, previewDimensions, printDimensions, sheets, targetHead } from './formats.js';
 import { activate, isPro } from './license.js';
 import { cutout, findFace } from './vision.js';
-import { jpeg, makeCanvas, makeSheet, pdf, save, watermark } from './exports.js';
+import { checkOriginalJpeg, jpeg, makeCanvas, makeSheet, pdf, save, watermark } from './exports.js';
 
 const $ = id => document.getElementById(id);
 const preview = $('preview');
@@ -22,6 +22,7 @@ const colors = { original: '#fff', white: '#fff', cream: '#f5f1e8', blue: '#dcec
 const a4Upsell = 'Activate Pro to export an A4 sheet.';
 
 let source;
+let original;
 let foreground;
 let maskedSource;
 const pendingMattes = new WeakMap();
@@ -49,10 +50,6 @@ function format() {
   return mm.every(value => Number.isFinite(value) && value >= 10 && value <= 200) ? { ...preset, mm } : null;
 }
 
-function dimensions(preset) {
-  return preset.pixels ?? preset.mm.map(mmToPixels);
-}
-
 function paint(ctx, width, height) {
   const useMask = background.value !== 'original' && foreground;
   ctx.fillStyle = useMask ? colors[background.value] : '#fff';
@@ -71,7 +68,7 @@ function paint(ctx, width, height) {
 
 function render() {
   const preset = format();
-  const [width, height] = dimensions(preset ?? presets.at(-1));
+  const [width, height] = previewDimensions(preset ?? presets.at(-1));
   const ratio = width / height;
   const scale = Math.min(1, 840 / Math.max(width, height));
   const w = Math.round(width * scale);
@@ -82,16 +79,29 @@ function render() {
   }
   $('frame').style.setProperty('--ratio', ratio);
   $('frame').style.setProperty('--frame-max', Math.min(310, 330 * ratio) + 'px');
-  const head = targetHead(preset ?? presets.at(-1));
-  $('frame').style.setProperty('--crown', (0.48 - head / 2) * 100 + '%');
-  $('frame').style.setProperty('--chin', (0.48 + head / 2) * 100 + '%');
-  $('metrics').textContent = preset
-    ? `${width} × ${height} px · head ${Math.round(preset.head[0] * preset.mm[1])}–${Math.round(preset.head[1] * preset.mm[1])} mm`
-    : 'Enter dimensions between 10 and 200 mm';
+  const guidePreset = preset ?? presets.at(-1);
+  const head = targetHead(guidePreset);
+  const center = headCenter(guidePreset);
+  $('frame').style.setProperty('--crown', (center - head / 2) * 100 + '%');
+  $('frame').style.setProperty('--chin', (center + head / 2) * 100 + '%');
+  const digital = preset && digitalDimensions(preset);
+  $('metrics').textContent = preset ? [
+    digital && `${digital.join(' × ')} px`,
+    preset.digital?.minPixels && original && `${original.width} × ${original.height} px original`,
+    preset.mm && `${preset.mm.join(' × ')} mm ${preset.print === false ? 'reference' : 'print'}`,
+  ].filter(Boolean).join(' · ') : 'Enter dimensions between 10 and 200 mm';
   $('frame').classList.toggle('has-photo', Boolean(source));
   $('frame').classList.toggle('no-guides', !$('show-guides').checked);
-  for (const button of document.querySelectorAll('[data-download]')) button.disabled = !source || !preset || waitingForMatte();
+  for (const button of document.querySelectorAll('[data-download]')) {
+    button.disabled = !canDownload(button.dataset.download, preset);
+  }
   paint(previewCtx, w, h);
+}
+
+function canDownload(kind, preset) {
+  return Boolean(source && preset && (kind === 'digital'
+    ? preset.digital && (preset.digital.minPixels || !waitingForMatte())
+    : preset.mm && preset.print !== false && !waitingForMatte()));
 }
 
 function waitingForMatte() {
@@ -109,11 +119,11 @@ function fitPhoto(box) {
   Object.assign(pose, { x: 0.5, y: 0.5, zoom: 1, angle: 0 });
   const preset = format();
   if (box && source && preset) {
-    const [width, height] = dimensions(preset);
+    const [width, height] = previewDimensions(preset);
     const base = Math.max(width / source.width, height / source.height);
     pose.zoom = Math.min(5, Math.max(0.65, height * targetHead(preset) / (box.height * 1.35 * base)));
     pose.x = (box.originX + box.width / 2) / source.width;
-    pose.y = (box.originY + box.height * 0.36 + height * 0.02 / (base * pose.zoom)) / source.height;
+    pose.y = (box.originY + box.height * 0.36 + height * (0.5 - headCenter(preset)) / (base * pose.zoom)) / source.height;
   }
   updateControls();
   render();
@@ -169,6 +179,7 @@ async function loadPhoto(input) {
     const scale = Math.min(1, 2400 / Math.max(bitmap.width, bitmap.height));
     const canvas = makeCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)));
     canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    original = { blob: input, width: bitmap.width, height: bitmap.height };
     bitmap.close();
     source = canvas;
   } catch {
@@ -250,18 +261,53 @@ function updatePro() {
   for (const item of document.querySelectorAll('[data-tier]')) {
     item.textContent = pro ? 'Pro active' : 'Free preview';
   }
-  maxKB.disabled = !pro;
-  maxKB.hidden = !pro;
-  maxKBUpsell.hidden = pro;
+  const digital = format()?.digital;
+  const canSetLimit = Boolean(digital && !digital.minPixels);
+  maxKB.disabled = !pro || !canSetLimit;
+  maxKB.hidden = !pro || !canSetLimit;
+  maxKBUpsell.hidden = pro || !canSetLimit;
+  $('max-kb-label').hidden = !canSetLimit;
   $('max-kb-label').htmlFor = pro ? maxKB.id : maxKBUpsell.id;
   for (const button of document.querySelectorAll('[data-license]')) {
     button.hidden = pro;
   }
 }
 
+function updatePreset() {
+  const preset = presets.find(item => item.id === presetSelect.value);
+  $('custom-size').hidden = preset.id !== 'custom';
+  $('preset-notice').textContent = preset.notice ?? '';
+  const guide = $('preset-guide');
+  guide.hidden = !preset.guide;
+  if (preset.guide) guide.href = preset.guide;
+  else guide.removeAttribute('href');
+  const resetBackground = background.value !== 'original' && !preset.backgrounds?.includes(background.value);
+  for (const option of background.options) {
+    option.disabled = option.value !== 'original' && !preset.backgrounds?.includes(option.value);
+  }
+  background.disabled = !preset.backgrounds?.length;
+  if (resetBackground) {
+    background.value = 'original';
+    void updateBackground();
+  }
+  paper.disabled = !preset.mm || preset.print === false;
+  document.querySelector('[data-download="digital"]').textContent = preset.digital?.minPixels ? 'Save Original JPG' : 'Digital JPG';
+  updatePro();
+}
+
 async function download(kind, button) {
   const preset = format();
-  if (!source || !preset || waitingForMatte()) return;
+  if (!canDownload(kind, preset)) return;
+  if (kind === 'digital' && preset.digital.minPixels) {
+    try {
+      checkOriginalJpeg(original.blob, original.width, original.height, preset.digital);
+      save(original.blob, `photoid-${preset.id}-original.jpg`);
+      announce('Original JPG saved unchanged. Check the official guidance before submitting.');
+    } catch (error) {
+      announce(error.message, true);
+    }
+    return;
+  }
   const paperId = paper.value;
   if (!pro && (!preset.free || (kind !== 'digital' && paperId === 'a4'))) {
     announce(!preset.free ? 'Activate Pro to download this preset.' : a4Upsell, false, true);
@@ -272,14 +318,20 @@ async function download(kind, button) {
     maxKB.reportValidity();
     return;
   }
+  if (pro && kind === 'digital' && limit && limit < (preset.digital.minKB ?? 0)) {
+    announce(`The Max KB setting must be at least ${preset.digital.minKB} KB for this format.`, true);
+    return;
+  }
   button.disabled = true;
   try {
-    const photo = makeCanvas(...dimensions(preset));
+    const photo = makeCanvas(...(kind === 'digital' ? digitalDimensions(preset) : printDimensions(preset)));
     const ctx = photo.getContext('2d');
     paint(ctx, photo.width, photo.height);
     if (!pro) watermark(ctx, photo.width, photo.height);
     if (kind === 'digital') {
-      const blob = await jpeg(photo, pro ? limit : 0);
+      const { minKB, maxKB } = preset.digital;
+      const ceiling = pro && limit ? Math.min(limit, maxKB ?? Infinity) : maxKB;
+      const blob = await jpeg(photo, { minKB, maxKB: ceiling });
       save(blob, `photoid-${preset.id}.jpg`);
       announce(`Digital JPG saved · ${(blob.size / 1000).toFixed(1)} KB${pro ? '' : ' · watermarked preview'}.`);
       return;
@@ -293,7 +345,7 @@ async function download(kind, button) {
   } catch (error) {
     announce(error.message, true);
   } finally {
-    button.disabled = !source || !format() || waitingForMatte();
+    button.disabled = !canDownload(kind, format());
   }
 }
 
@@ -362,8 +414,9 @@ $('snap').addEventListener('click', capture);
 cameraDialog.addEventListener('close', stopCamera);
 
 presetSelect.addEventListener('change', () => {
-  $('custom-size').hidden = presetSelect.value !== 'custom';
   manualRevision++;
+  updatePreset();
+  announce('');
   fitPhoto(face);
 });
 for (const id of ['width-mm', 'height-mm', 'show-guides']) $(id).addEventListener('input', render);
@@ -414,6 +467,6 @@ preview.addEventListener('keydown', event => {
   pan(...directions[event.key]);
 });
 
-updatePro();
+updatePreset();
 updateControls();
 render();

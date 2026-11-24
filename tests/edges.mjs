@@ -16,6 +16,7 @@ const sheet = await browser.newPage({ viewport: { width: 1720, height: 930 } });
 
 async function renderPortrait(page, url, filepath, color) {
   await page.goto(url);
+  await page.locator('#preset').selectOption('custom');
   await page.locator('#file').setInputFiles(filepath);
   await page.waitForFunction(() => !document.querySelector('#editor-status').textContent.startsWith('Looking for') &&
     document.querySelector('#frame').classList.contains('has-photo'), {}, { timeout: 40000 });

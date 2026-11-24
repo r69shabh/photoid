@@ -82,12 +82,29 @@ export async function setDensity(blob) {
   return new Blob([bytes.subarray(0, 2), jfif, bytes.subarray(2)], { type: 'image/jpeg' });
 }
 
-export async function jpeg(canvas, targetKB) {
+export function checkOriginalJpeg(blob, width, height, { minPixels, minKB, maxKB }) {
+  if (blob.type !== 'image/jpeg') throw new Error('Choose an original JPG. PhotoID does not convert or crop this download.');
+  if (width < minPixels[0] || height < minPixels[1]) {
+    throw new Error(`Choose an original photo at least ${minPixels[0]} × ${minPixels[1]} pixels. Do not upscale it.`);
+  }
+  if (blob.size < minKB * 1000 || blob.size > maxKB * 1000) {
+    throw new Error(`Choose an original JPG between ${minKB} KB and ${maxKB / 1000} MB. Do not recompress it.`);
+  }
+}
+
+export async function jpeg(canvas, { minKB = 0, maxKB } = {}) {
+  const minimum = minKB * 1000;
+  const limit = maxKB ? maxKB * 1000 : Infinity;
+  const tooSmall = () => new Error(`The JPG is smaller than ${minKB} KB at the required dimensions. Try a higher-quality original.`);
   let candidate = await setDensity(await encode(canvas, 0.95));
-  if (!targetKB || candidate.size <= targetKB * 1000) return candidate;
-  const limit = targetKB * 1000;
-  let low = 0.05;
   let high = 0.95;
+  if (candidate.size < minimum) {
+    high = 1;
+    candidate = await setDensity(await encode(canvas, high));
+    if (candidate.size < minimum) throw tooSmall();
+  }
+  if (candidate.size <= limit) return candidate;
+  let low = 0.05;
   candidate = await setDensity(await encode(canvas, low));
   if (candidate.size > limit) throw new Error('This photo can’t fit that KB limit at its current dimensions. Try a higher limit.');
   for (let i = 0; i < 8; i++) {
@@ -100,6 +117,7 @@ export async function jpeg(canvas, targetKB) {
       high = mid;
     }
   }
+  if (candidate.size < minimum) throw tooSmall();
   return candidate;
 }
 

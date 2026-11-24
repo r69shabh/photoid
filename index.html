@@ -72,7 +72,8 @@
           <div class="controls">
             <div class="control-heading"><span class="eyebrow">02 / PHOTO SETUP</span><button class="quiet" type="button" id="reset">Reset crop</button></div>
             <label for="preset">Document format</label>
-            <select id="preset"></select>
+            <select id="preset" aria-describedby="preset-notice"></select>
+            <p class="hint"><span id="preset-notice"></span> <a id="preset-guide" target="_blank" rel="noopener noreferrer" hidden>Official photo guidance ↗</a></p>
             <div class="two-fields" id="custom-size" hidden>
               <div><label for="width-mm">Width (mm)</label><input id="width-mm" type="number" value="35" min="10" max="200" step="0.1" /></div>
               <div><label for="height-mm">Height (mm)</label><input id="height-mm" type="number" value="45" min="10" max="200" step="0.1" /></div>
@@ -127,16 +128,16 @@
       </section>
 
       <section id="pricing" class="pricing section">
-        <div><span class="eyebrow">ONE PAYMENT, NO SUBSCRIPTION</span><h2>Keep the studio money.</h2><p>Try the editor and watermarked India 35 × 45 mm or US exports for free. PhotoID Pro removes the watermark, unlocks every export preset, and adds A4 sheets and a digital JPG size limit.</p></div>
+        <div><span class="eyebrow">ONE PAYMENT, NO SUBSCRIPTION</span><h2>Pay once for supported exports.</h2><p>Try the editor and watermarked India passport or US exports for free. PhotoID Pro removes the watermark, unlocks other supported downloads, and adds A4 sheets and a custom JPG size limit. Check your format’s guidance before buying.</p></div>
         <div class="price-card"><span class="eyebrow">PHOTOID PRO</span><strong>₹99 <small>lifetime</small></strong><a class="button primary" data-buy target="_blank" rel="noopener noreferrer">Buy on Gumroad <span aria-hidden="true">↗</span></a><small id="checkout-note" hidden>Checkout is not live yet.</small><button class="quiet" type="button" data-license>Already have a license?</button></div>
       </section>
 
       <section id="faq" class="faq section">
         <div><span class="eyebrow">BEFORE YOU SUBMIT</span><h2>Good to know.</h2></div>
         <div class="questions">
-          <details><summary>What passport and visa photo sizes can I make?</summary><p>PhotoID includes 2 × 2 inch presets for US passport and visa photos and for OCI, plus 35 × 45 mm presets for India, UK and Schengen. You can try any crop in the editor. Free exports are watermarked and limited to the India 35 × 45 mm and US presets; Pro unlocks every export preset without a watermark. Check your application instructions before choosing a size.</p></details>
+          <details><summary>What passport and visa photo sizes can I make?</summary><p>Digital JPGs and print layouts have different requirements. The editor shows the supported downloads and official guidance when you choose a format. For online UK passport applications it can save an eligible original JPG unchanged. PhotoID does not produce Canadian passport photos. Free India passport and US crop exports are watermarked; Pro removes the watermark from supported exports.</p></details>
           <details><summary>Where does my photo go?</summary><p>Nowhere. Your browser handles the photo, camera, crop, background and exports. Automatic framing and background removal download models, not your image. Gumroad only receives the key when you activate Pro.</p></details>
-          <details><summary>Will my application accept the photo?</summary><p>PhotoID does not certify eligibility. Check the official requirements for your specific application, including head size, background and whether edits are allowed. Use your original background where edited photos are prohibited. Do not submit a watermarked preview.</p></details>
+          <details><summary>Will my application accept the photo?</summary><p>PhotoID does not certify eligibility. Check the official requirements beside your format before editing, printing or buying. Some applications only accept originals or studio photos. Do not submit a watermarked preview or use a custom crop to bypass those requirements.</p></details>
           <details><summary>How do I print at the right size?</summary><p>Pick the paper size in PhotoID and in your print dialog, then choose Actual size or 100%. Turn off “Fit to page.” Measure one cut rectangle before printing further copies.</p></details>
           <details><summary>How do I unlock Pro?</summary><p>Buy once on Gumroad. Paste the license key from your receipt above; activation is stored in this browser. On a new browser or after clearing site data, enter the same key again.</p></details>
         </div>

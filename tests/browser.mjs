@@ -50,8 +50,10 @@ try {
   await page.locator('#file').setInputFiles(PHOTOID_SAMPLE);
   await page.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Face found.'), { }, { timeout: 40000 });
   console.log(await status());
-  assert.match(await page.locator('#metrics').textContent(), /413 × 531 px/);
+  assert.match(await page.locator('#metrics').textContent(), /630 × 810 px · 35 × 45 mm print/);
 
+  assert.ok(await page.locator('#background').isDisabled(), 'Passport Seva prohibits retouching');
+  await page.locator('#preset').selectOption('custom');
   await page.locator('#background').selectOption('blue');
   await page.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Background replaced.'), { }, { timeout: 40000 });
   assert.doesNotMatch(await status(), /simple mode/);
@@ -65,13 +67,15 @@ try {
   if (PHOTOID_EVIDENCE) await page.locator('#editor').screenshot({ path: join(PHOTOID_EVIDENCE, 'photoid-editor.png') });
   console.log('Light-blue background was applied and the portrait remained visible.');
 
+  await page.locator('#preset').selectOption('in');
+  assert.equal(await page.locator('#background').inputValue(), 'original');
   const digital = await download('digital');
-  const photo = await inspectImage(digital, [[8, 8], [405, 525]]);
-  assert.deepEqual(photo.size, [413, 531]);
-  assert.ok(photo.colors[0][2] > 245);
-  assert.ok(photo.colors[1][0] < 100 && photo.colors[1][2] < 100, 'Watermark rectangle is dark');
+  const photo = await inspectImage(digital, [[622, 803]]);
+  assert.deepEqual(photo.size, [630, 810]);
+  assert.ok(digital.length <= 250000);
+  assert.ok(photo.colors[0][0] < 100 && photo.colors[0][2] < 100, 'Watermark rectangle is dark');
   assert.deepEqual([...digital.subarray(13, 18)], [1, 1, 44, 1, 44]);
-  console.log('Watermarked digital JPG: 413 × 531 at 300 DPI.');
+  console.log('Watermarked India digital JPG: 630 × 810, ≤250 KB, at 300 DPI.');
 
   const sheet = await download('sheet');
   const sheetImage = await inspectImage(sheet, [[10, 10], [577, 600]]);
@@ -132,6 +136,44 @@ try {
   console.log('Camera preview, capture and stream release passed with a fake device.');
   assert.deepEqual(errors, []);
 
+  await page.evaluate(id => localStorage.setItem('photoid-pro', id), PRODUCT_ID);
+  await page.reload();
+  const fixture = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 1500;
+    const ctx = canvas.getContext('2d');
+    const image = ctx.createImageData(canvas.width, canvas.height);
+    let seed = 1953;
+    for (let i = 0; i < image.data.length; i += 4) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      image.data.set([seed >>> 24, (seed >>> 16) & 255, (seed >>> 8) & 255, 255], i);
+    }
+    ctx.putImageData(image, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+  });
+  const original = Buffer.from(fixture, 'base64');
+  await page.locator('#file').setInputFiles({ name: 'texture.jpg', mimeType: 'image/jpeg', buffer: original });
+  await page.waitForFunction(() => document.querySelector('#frame').classList.contains('has-photo'));
+  for (const [id, size, min, max] of [
+    ['in', [630, 810], 0, 250], ['oci', [600, 600], 0, 200], ['in-evisa', [600, 600], 10, 1000],
+    ['us', [600, 600], 54, 240], ['uk', [1200, 1500], 50, 10000],
+    ['cn', [354, 472], 40, 120], ['custom', [413, 531], 0, Infinity],
+  ]) {
+    await page.locator('#preset').selectOption(id);
+    const jpg = await download('digital');
+    assert.deepEqual((await inspectImage(jpg, [])).size, size, id);
+    assert.ok(jpg.length >= min * 1000 && jpg.length <= max * 1000, id);
+    if (id === 'uk') assert.deepEqual(jpg, original, 'UK download must be byte-identical to the upload');
+  }
+  for (const id of ['eu', 'ca', 'au', 'cn-print']) {
+    await page.locator('#preset').selectOption(id);
+    assert.ok(await page.locator('[data-download="digital"]').isDisabled(), id);
+    assert.ok(await page.locator('#preset-guide').isVisible(), id);
+  }
+  console.log('Every digital preset exports the expected dimensions and file size; the UK JPG is unchanged. Unsupported digital exports are disabled.');
+  assert.deepEqual(errors, []);
+
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, deviceScaleFactor: 1, hasTouch: true });
   await mobile.route(url => /\/portrait\.worker(?:-[^/]+)?\.js$/.test(url.pathname), route => route.abort());
   await mobile.goto(url);
@@ -140,6 +182,7 @@ try {
   console.log('Mobile layout at 390px has no horizontal overflow.');
   await mobile.locator('#file').setInputFiles(PHOTOID_SAMPLE);
   await mobile.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Face found.'));
+  await mobile.locator('#preset').selectOption('custom');
   await mobile.locator('#background').selectOption('white');
   await mobile.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Background replaced with simple mode.'));
   console.log('MediaPipe fallback works when the portrait worker cannot load.');

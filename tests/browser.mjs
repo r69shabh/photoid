@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
-import { GUMROAD_URL } from '../src/config.js';
+import { GUMROAD_URL, PRODUCT_ID } from '../src/config.js';
 
 const { CHROME_BIN, PHOTOID_SAMPLE, PHOTOID_EVIDENCE } = process.env;
 const url = process.env.PHOTOID_URL ?? 'http://localhost:4173/photoid/';
@@ -115,8 +115,10 @@ try {
     page.waitForResponse('https://api.gumroad.com/v2/licenses/verify'),
     page.locator('#verify').click(),
   ]);
+  const licenseBody = licenseResponse.request().postData();
+  assert.ok(licenseBody.includes('product_id=' + encodeURIComponent(PRODUCT_ID) + '&'));
   console.log('Gumroad browser response:', licenseResponse.status(), licenseResponse.headers()['access-control-allow-origin']);
-  await page.waitForFunction(() => document.querySelector('#license-status').textContent.includes('could not be verified'));
+  await page.waitForFunction(() => document.querySelector('#license-status').textContent.includes('Check the PhotoID license key in your Gumroad receipt.'));
   console.log(await page.locator('#license-status').textContent());
   await screenshot('photoid-license-error.png');
   await page.getByRole('button', { name: 'Close license dialog' }).click();

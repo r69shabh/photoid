@@ -1,2 +1,2 @@
-export const GUMROAD_URL = 'https://rishabh.gumroad.com/l/photoid';
-export const PRODUCT_ID = 'TODO';
+export const GUMROAD_URL = 'https://rishabhgusain.gumroad.com/l/gvbxs';
+export const PRODUCT_ID = 'PpmuXTlt4b1MRN8D8TJYSQ==';

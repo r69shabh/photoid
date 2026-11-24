@@ -24,6 +24,7 @@ const a4Upsell = 'Activate Pro to export an A4 sheet.';
 let source;
 let foreground;
 let maskedSource;
+const pendingMattes = new WeakMap();
 let face;
 let stream;
 let cameraRequest = 0;
@@ -89,8 +90,12 @@ function render() {
     : 'Enter dimensions between 10 and 200 mm';
   $('frame').classList.toggle('has-photo', Boolean(source));
   $('frame').classList.toggle('no-guides', !$('show-guides').checked);
-  for (const button of document.querySelectorAll('[data-download]')) button.disabled = !source || !preset;
+  for (const button of document.querySelectorAll('[data-download]')) button.disabled = !source || !preset || waitingForMatte();
   paint(previewCtx, w, h);
+}
+
+function waitingForMatte() {
+  return background.value !== 'original' && !foreground;
 }
 
 function updateControls() {
@@ -126,12 +131,22 @@ async function updateBackground() {
     return;
   }
   announce('Removing the background on your device…');
+  render();
   try {
-    const result = await cutout(input);
+    let pending = pendingMattes.get(input);
+    if (!pending) {
+      pending = cutout(input, message => {
+        if (source === input && background.value !== 'original') announce(message);
+      }).finally(() => pendingMattes.delete(input));
+      pendingMattes.set(input, pending);
+    }
+    const result = await pending;
     if (revision !== maskRevision || source !== input) return;
-    foreground = result;
+    foreground = result.foreground;
     maskedSource = input;
-    announce('Background replaced. Check edges and confirm your application allows edits.');
+    announce(result.basic
+      ? 'Background replaced with simple mode. Check the edges carefully.'
+      : 'Background replaced. Check edges and confirm your application allows edits.');
   } catch {
     if (revision !== maskRevision || source !== input) return;
     background.value = 'original';
@@ -246,7 +261,7 @@ function updatePro() {
 
 async function download(kind, button) {
   const preset = format();
-  if (!source || !preset) return;
+  if (!source || !preset || waitingForMatte()) return;
   const paperId = paper.value;
   if (!pro && (!preset.free || (kind !== 'digital' && paperId === 'a4'))) {
     announce(!preset.free ? 'Activate Pro to download this preset.' : a4Upsell, false, true);
@@ -278,7 +293,7 @@ async function download(kind, button) {
   } catch (error) {
     announce(error.message, true);
   } finally {
-    button.disabled = !source || !format();
+    button.disabled = !source || !format() || waitingForMatte();
   }
 }
 

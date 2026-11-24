@@ -3,6 +3,9 @@ const modelRoot = 'https://storage.googleapis.com/mediapipe-models/';
 let runtime;
 let detector;
 let segmenter;
+let worker;
+let sequence = 0;
+const jobs = new Map();
 
 function getRuntime() {
   return runtime ??= import('@mediapipe/tasks-vision').then(async vision => ({
@@ -26,7 +29,7 @@ export async function findFace(canvas) {
   return detections.length === 1 ? detections[0].boundingBox : null;
 }
 
-export async function cutout(canvas) {
+async function basicCutout(canvas) {
   segmenter ??= getRuntime().then(({ vision, files }) => vision.ImageSegmenter.createFromOptions(files, {
     baseOptions: { modelAssetPath: modelRoot + 'image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite' },
     outputCategoryMask: false,
@@ -59,4 +62,53 @@ export async function cutout(canvas) {
   });
   if (!result) throw new Error('No portrait mask');
   return result;
+}
+
+function mattingWorker() {
+  if (worker) return worker;
+  worker = new Worker(new URL('./portrait.worker.js', import.meta.url), { type: 'module' });
+  worker.addEventListener('message', ({ data: { id, progress, result, failed } }) => {
+    const job = jobs.get(id);
+    if (progress) {
+      job?.progress(progress);
+      return;
+    }
+    jobs.delete(id);
+    if (failed) job?.reject(new Error('Portrait matting failed'));
+    else job?.resolve(result);
+  });
+  worker.addEventListener('error', () => {
+    worker.terminate();
+    worker = undefined;
+    for (const job of jobs.values()) job.reject(new Error('Portrait worker unavailable'));
+    jobs.clear();
+  });
+  return worker;
+}
+
+export async function cutout(canvas, progress) {
+  try {
+    const image = await createImageBitmap(canvas);
+    const id = ++sequence;
+    const result = await new Promise((resolve, reject) => {
+      try {
+        const portrait = mattingWorker();
+        jobs.set(id, { progress, resolve, reject });
+        portrait.postMessage({ id, image }, [image]);
+      } catch (error) {
+        jobs.delete(id);
+        image.close();
+        reject(error);
+      }
+    });
+    const foreground = document.createElement('canvas');
+    foreground.width = canvas.width;
+    foreground.height = canvas.height;
+    foreground.getContext('2d').drawImage(result, 0, 0, canvas.width, canvas.height);
+    result.close();
+    return { foreground, basic: false };
+  } catch {
+    progress('Detailed matting unavailable. Trying simple background removal…');
+    return { foreground: await basicCutout(canvas), basic: true };
+  }
 }

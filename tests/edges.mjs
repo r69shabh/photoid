@@ -14,7 +14,7 @@ const portraits = [
 const browser = await chromium.launch({ executablePath: CHROME_BIN });
 const sheet = await browser.newPage({ viewport: { width: 1720, height: 930 } });
 
-async function renderPortrait(page, url, filepath, color, refined) {
+async function renderPortrait(page, url, filepath, color) {
   await page.goto(url);
   await page.locator('#file').setInputFiles(filepath);
   await page.waitForFunction(() => !document.querySelector('#editor-status').textContent.startsWith('Looking for') &&
@@ -27,7 +27,7 @@ async function renderPortrait(page, url, filepath, color, refined) {
   await page.locator('#background').selectOption(color);
   await page.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Background replaced'), {}, { timeout: 50000 });
   const milliseconds = Math.round(performance.now() - start);
-  if (refined) assert.doesNotMatch(await page.locator('#editor-status').textContent(), /simple mode/);
+  assert.doesNotMatch(await page.locator('#editor-status').textContent(), /simple mode/);
   const preview = await page.locator('#preview').evaluate(canvas => ({
     url: canvas.toDataURL(), width: canvas.width, height: canvas.height,
   }));
@@ -46,7 +46,7 @@ async function compare(before, after, title, filename) {
       const x = 24 + 846 * column;
       const bitmap = await createImageBitmap(await (await fetch(image.url)).blob());
       ctx.font = 'bold 19px system-ui';
-      ctx.fillText(column === 0 ? 'BEFORE · existing MediaPipe mask' : 'AFTER · MODNet + edge cleanup', x, 66);
+      ctx.fillText(column === 0 ? 'BEFORE · original MODNet cutout' : 'AFTER · MediaPipe guard + MODNet cleanup', x, 66);
       ctx.font = '16px system-ui';
       const width = bitmap.width;
       ctx.fillText('Hair / crown', x, 94);
@@ -71,12 +71,17 @@ try {
     }
     for (const [name, file] of portraits) {
       const filepath = join(PHOTOID_FIXTURES, file);
-      const before = await renderPortrait(baseline, PHOTOID_BASELINE_URL, filepath, 'white', false);
-      const after = await renderPortrait(candidate, PHOTOID_URL, filepath, 'white', true);
+      const before = await renderPortrait(baseline, PHOTOID_BASELINE_URL, filepath, 'white');
+      const after = await renderPortrait(candidate, PHOTOID_URL, filepath, 'white');
       await compare(before, after, name + ' · ' + viewport + ' · white', viewport + '-' + name + '-2x.png');
       console.log(viewport, name, 'before=' + before.milliseconds + 'ms', 'after=' + after.milliseconds + 'ms');
+      if (name === 'jemison' || name === 'epps') {
+        const beforeBlue = await renderPortrait(baseline, PHOTOID_BASELINE_URL, filepath, 'blue');
+        const afterBlue = await renderPortrait(candidate, PHOTOID_URL, filepath, 'blue');
+        await compare(beforeBlue, afterBlue, name + ' · ' + viewport + ' · light blue', viewport + '-' + name + '-blue-2x.png');
+      }
     }
-    const blue = await renderPortrait(candidate, PHOTOID_URL, join(PHOTOID_FIXTURES, portraits[0][1]), 'blue', true);
+    const blue = await renderPortrait(candidate, PHOTOID_URL, join(PHOTOID_FIXTURES, portraits[0][1]), 'blue');
     assert.ok(blue.width > 0);
     assert.equal(await candidate.evaluate(() => document.documentElement.scrollWidth), options.viewport.width);
     await candidate.locator('#editor').screenshot({ path: join(PHOTOID_EVIDENCE, viewport + '-editor-light-blue.png') });

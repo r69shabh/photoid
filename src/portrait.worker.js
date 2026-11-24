@@ -1,4 +1,4 @@
-import { refineMatte } from './matte.js';
+import { personGate, refineMatte } from './matte.js';
 
 const ortRoot = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
 const weights = 'https://huggingface.co/Xenova/modnet/resolve/fa2fa546052fba4c08921230a26cc69a333fca12/onnx/model.onnx';
@@ -19,7 +19,7 @@ async function loadModel() {
   return { session, Tensor: ort.Tensor };
 }
 
-async function makeMatte(image, progress) {
+async function makeMatte(image, person, progress) {
   if (!model) {
     progress('Loading the portrait model on your device…');
     model = loadModel().catch(error => {
@@ -58,7 +58,16 @@ async function makeMatte(image, progress) {
   const ctx = full.getContext('2d', { willReadFrequently: true });
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(small, 0, 0, width, height);
+  const gateCanvas = new OffscreenCanvas(person.width, person.height);
+  const gateCtx = gateCanvas.getContext('2d');
+  const gate = personGate(person);
+  const gatePixels = gateCtx.createImageData(person.width, person.height);
+  for (let i = 0; i < gate.length; i++) gatePixels.data[i * 4 + 3] = gate[i];
+  gateCtx.putImageData(gatePixels, 0, 0);
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.drawImage(gateCanvas, 0, 0, width, height);
   const mask = ctx.getImageData(0, 0, width, height).data;
+  ctx.globalCompositeOperation = 'source-over';
   ctx.clearRect(0, 0, width, height);
   ctx.drawImage(image, 0, 0, width, height);
   const pixels = ctx.getImageData(0, 0, width, height);
@@ -67,9 +76,9 @@ async function makeMatte(image, progress) {
   return full.transferToImageBitmap();
 }
 
-self.addEventListener('message', async ({ data: { id, image } }) => {
+self.addEventListener('message', async ({ data: { id, image, person } }) => {
   try {
-    const result = await makeMatte(image, progress => self.postMessage({ id, progress }));
+    const result = await makeMatte(image, person, progress => self.postMessage({ id, progress }));
     self.postMessage({ id, result }, [result]);
   } catch {
     self.postMessage({ id, failed: true });

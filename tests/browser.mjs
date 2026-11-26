@@ -46,6 +46,20 @@ async function screenshot(name) {
 }
 
 try {
+  const noScripts = await browser.newPage({ javaScriptEnabled: false });
+  await noScripts.goto(url);
+  await noScripts.getByRole('link', { name: 'UK passport photo · digital or 35 × 45 mm' }).click();
+  assert.match(noScripts.url(), /\/uk-passport-photo-size\/$/);
+  assert.ok(await noScripts.getByRole('heading', { name: /UK Passport Photo Size/ }).isVisible());
+  assert.match(await noScripts.locator('dl').textContent(), /600 × 750 pixels/);
+  const editorLink = await noScripts.getByRole('link', { name: 'Open the PhotoID editor' }).getAttribute('href');
+  await noScripts.close();
+  await page.goto(new URL(editorLink, new URL('uk-passport-photo-size/', url)).href);
+  assert.equal(await page.locator('#preset').inputValue(), 'uk');
+  await page.goto(new URL('?preset=unknown#editor', url).href);
+  assert.equal(await page.locator('#preset').inputValue(), 'in');
+  console.log('The UK guide renders without JavaScript and links to the preselected editor; unknown presets use the default.');
+
   await page.goto(url);
   await page.locator('#file').setInputFiles(PHOTOID_SAMPLE);
   await page.waitForFunction(() => document.querySelector('#editor-status').textContent.startsWith('Face found.'), { }, { timeout: 40000 });

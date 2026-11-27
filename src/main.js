@@ -352,6 +352,8 @@ async function download(kind, button) {
 for (const preset of presets) {
   presetSelect.add(new Option(preset.name, preset.id));
 }
+const requestedPreset = new URLSearchParams(location.search).get('preset');
+if (presets.some(({ id }) => id === requestedPreset)) presetSelect.value = requestedPreset;
 for (const link of document.querySelectorAll('[data-buy]')) link.href = GUMROAD_URL;
 $('checkout-note').hidden = PRODUCT_ID !== 'TODO';
 for (const button of document.querySelectorAll('[data-license]')) {

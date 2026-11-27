@@ -125,6 +125,9 @@ p { color: var(--muted); line-height: 1.55; }
 .price-card .primary { background: var(--lime); color: var(--forest); }
 .price-card .primary:hover { background: #efffb6; }
 .price-card .quiet { color: #dfe9df; font-size: .78rem; }
+.guide-list p { margin-top: 12px; max-width: 620px; }
+.guide-list ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 10px; margin: 17px 0 0; padding: 0; list-style: none; }
+.guide-list a { display: block; padding: 12px 15px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcf9; color: var(--forest); font-weight: 700; text-decoration: underline; text-underline-offset: .18em; }
 .faq { display: grid; grid-template-columns: .85fr 1.4fr; gap: 20px; }
 .questions details { padding: 13px 0; border-bottom: 1px solid var(--line); }
 .questions summary { font-weight: 750; cursor: pointer; }

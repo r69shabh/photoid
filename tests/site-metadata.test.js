@@ -33,7 +33,8 @@ test('URL-dependent metadata is omitted until the public PhotoID URL is configur
         assert.equal(image, expectedImage);
         const canonical = output.match(/<link rel="canonical" href="([^"]+)"[^>]*>/)?.[1] ?? null;
         assert.equal(canonical, siteUrl ? siteUrl + '/' : null);
-        assert.doesNotMatch(output, /google-site-verification|msvalidate\.01/);
+        assert.match(output, /<meta name="google-site-verification" content="mnigM1COSWrqxQG5yYZ5Kj1iodg6heR5xX-OeBJxucM">/);
+        assert.doesNotMatch(output, /msvalidate\.01/);
       } finally {
         await server.close();
       }

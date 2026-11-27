@@ -3,6 +3,7 @@ import { GUMROAD_URL } from './src/config.js';
 import { seoPages } from './seo-pages.js';
 
 const base = '/photoid/';
+const defaultGoogleVerification = 'mnigM1COSWrqxQG5yYZ5Kj1iodg6heR5xX-OeBJxucM';
 
 function publicUrl(value) {
   if (!value) return;
@@ -22,7 +23,7 @@ export default defineConfig(({ mode }) => {
     plugins: [seoPages({
       base,
       site,
-      google: env.VITE_GOOGLE_SITE_VERIFICATION?.trim(),
+      google: env.VITE_GOOGLE_SITE_VERIFICATION?.trim() || defaultGoogleVerification,
       bing: env.VITE_BING_SITE_VERIFICATION?.trim(),
       application: site && {
         '@context': 'https://schema.org',
